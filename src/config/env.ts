@@ -22,7 +22,13 @@ const envSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string(),
   TWILIO_FROM_NUMBER: z.string(),
 
-  JWT_PUBLIC_KEY: z.string().transform((val) => val.replace(/\\n/g, "\n")),
+  JWT_PUBLIC_KEY: z.string().transform((val) => {
+    let key = val.trim();
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+      key = key.slice(1, -1);
+    }
+    return key.replace(/\\n/g, "\n").trim();
+  }),
   JWT_ISSUER: z.string(),
   JWT_AUDIENCE: z.string(),
 
