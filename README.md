@@ -97,6 +97,10 @@ Both apply pending migrations on boot; this is safe to run from both since Prism
 migrations with an advisory lock. Point `DATABASE_URL`/`REDIS_URL` at the managed resources and
 set the SMTP/Twilio/JWT env vars on both apps.
 
+For `JWT_PUBLIC_KEY`, paste the **base64-encoded** PEM (`npm run dev:keys` prints one) rather than
+the raw multi-line key — Coolify's env var field doesn't reliably preserve embedded newlines or
+quotes on paste, and base64 has neither.
+
 **Before the first deploy**, generate the initial migration against a real Postgres (local
 `docker compose up -d postgres` works) and commit it — `prisma/migrations` ships empty otherwise
 and `prisma migrate deploy` has nothing to apply:

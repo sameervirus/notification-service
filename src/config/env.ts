@@ -22,12 +22,33 @@ const envSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string(),
   TWILIO_FROM_NUMBER: z.string(),
 
-  JWT_PUBLIC_KEY: z.string().transform((val) => {
+  JWT_PUBLIC_KEY: z.string().transform((val, ctx) => {
     let key = val.trim();
+
+    // Recommended path: base64-encoded PEM. No newlines/quotes/backslashes to
+    // survive, so it's immune to how a given platform's env var UI stores values.
+    if (!key.startsWith("-----BEGIN") && !key.startsWith('"') && !key.startsWith("'")) {
+      const decoded = Buffer.from(key, "base64").toString("utf8").trim();
+      if (decoded.startsWith("-----BEGIN")) {
+        return decoded;
+      }
+    }
+
+    // Legacy path: raw or \n-escaped PEM, optionally wrapped in quotes.
     if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
       key = key.slice(1, -1);
     }
-    return key.replace(/\\n/g, "\n").trim();
+    key = key.replace(/\\n/g, "\n").trim();
+
+    if (!key.startsWith("-----BEGIN")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "JWT_PUBLIC_KEY must be a PEM public key or its base64 encoding",
+      });
+      return z.NEVER;
+    }
+
+    return key;
   }),
   JWT_ISSUER: z.string(),
   JWT_AUDIENCE: z.string(),
