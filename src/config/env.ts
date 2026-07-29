@@ -6,6 +6,7 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  LOG_PRETTY: z.coerce.boolean().default(false),
 
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
