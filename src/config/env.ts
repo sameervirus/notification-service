@@ -40,10 +40,14 @@ const envSchema = z.object({
     }
     key = key.replace(/\\n/g, "\n").trim();
 
-    if (!key.startsWith("-----BEGIN")) {
+    if (!key.includes("-----BEGIN") || !key.includes("-----END")) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "JWT_PUBLIC_KEY must be a PEM public key or its base64 encoding",
+        message:
+          "JWT_PUBLIC_KEY must be a PEM public key (with matching BEGIN/END lines) or its " +
+          `base64 encoding. Got ${key.length} chars, starting "${key.slice(0, 30)}" — this ` +
+          "usually means a single-line env var field truncated a multi-line paste at the " +
+          "first line break. Use the base64 form instead (npm run dev:keys prints one).",
       });
       return z.NEVER;
     }
