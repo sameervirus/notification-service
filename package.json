@@ -1,6 +1,6 @@
 {
   "name": "notification-service",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Provider-agnostic notification service (email/SMS) with queued delivery and audit logging",
   "type": "module",

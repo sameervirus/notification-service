@@ -5,12 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev            # API server, watch mode (tsx)
-npm run dev:worker     # BullMQ worker, watch mode — separate process from the API
+npm run dev            # API + worker, watch mode (tsx) — one process
+npm run dev:worker     # worker only, watch mode — for the split-process alternative, see below
 npm run typecheck      # tsc --noEmit over src/ + scripts/ (tsconfig.json)
 npm run build          # compiles src/ only to dist/ (tsconfig.build.json)
-npm run start          # prisma migrate deploy && node dist/server.js
-npm run start:worker   # prisma migrate deploy && node dist/worker.js
+npm run start          # prisma migrate deploy && node dist/server.js (runs API + worker)
+npm run start:worker   # prisma migrate deploy && node dist/worker.js (worker only)
 
 npm run prisma:generate       # regenerate src/generated/prisma (gitignored, required before typecheck/build)
 npm run prisma:migrate        # prisma migrate dev — creates+applies a migration locally
@@ -27,19 +27,24 @@ below). Copy `.env.example` to `.env` first.
 
 ## Architecture
 
-Two deployable processes share one codebase and one Docker image:
+By default, the API and worker run in **one process** (`src/server.ts` imports
+`./queue/worker.js` directly) — one deploy, no independent scaling, but zero extra setup. A
+standalone worker entry point (`src/worker.ts` → `src/queue/worker.ts`) still exists for splitting
+back into two deployable processes later (see Deployment); if you do that, remove the worker
+import from `src/server.ts` so it isn't also running inside the API process.
 
 - **API** (`src/server.ts` → `src/app.ts`): Fastify. Validates payloads with zod, writes a
   `Notification` row (`QUEUED`), enqueues a BullMQ job, returns `202` immediately. Never talks to
   providers directly.
-- **Worker** (`src/worker.ts` → `src/queue/worker.ts`): consumes the queue, calls the resolved
-  provider adapter, updates the notification's status. BullMQ retries failed jobs with exponential
-  backoff (5 attempts, `src/queue/notificationQueue.ts`); after the final attempt the `failed`
-  listener in `src/queue/worker.ts` marks the row `FAILED_PERMANENT`.
+- **Worker** (`src/queue/worker.ts`, started from either `src/server.ts` or `src/worker.ts`):
+  consumes the queue, calls the resolved provider adapter, updates the notification's status.
+  BullMQ retries failed jobs with exponential backoff (5 attempts, `src/queue/notificationQueue.ts`);
+  after the final attempt the `failed` listener in `src/queue/worker.ts` marks the row
+  `FAILED_PERMANENT`.
 
-Both processes run `prisma migrate deploy` before starting (see `start`/`start:worker` scripts).
-This is intentionally safe to run from both — Prisma serializes migrations with an advisory lock,
-so whichever process boots first applies them and the other no-ops.
+Both `start` and `start:worker` run `prisma migrate deploy` before starting. This is intentionally
+safe to run from both (relevant if you split into two processes) — Prisma serializes migrations
+with an advisory lock, so whichever boots first applies them and the other no-ops.
 
 ### Provider abstraction
 
@@ -99,9 +104,10 @@ This project uses Prisma 7, which changed the config surface from earlier versio
 
 ### Deployment
 
-Two Coolify Applications from the same `Dockerfile` and repo: one running the default start
-command (API), one with the start command overridden to `npm run start:worker`. Postgres and
-Redis are Coolify-managed database resources, not the `docker-compose.yml` in this repo (that file
-is local-dev only). See `README.md`'s Deployment section for the full checklist, including that
-`prisma/migrations` must contain at least one migration before the first deploy — `prisma migrate
-deploy` applies nothing if the directory is empty.
+Single Coolify Application, default start command (runs API + worker in one process — see
+Architecture above). Postgres and Redis are Coolify-managed database resources, not the
+`docker-compose.yml` in this repo (that file is local-dev only). See `README.md`'s Deployment
+section for the full checklist, including that `prisma/migrations` must contain at least one
+migration before the first deploy — `prisma migrate deploy` applies nothing if the directory is
+empty, and for splitting the worker into its own Coolify Application later if you need independent
+scaling.
