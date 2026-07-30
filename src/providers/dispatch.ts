@@ -1,5 +1,6 @@
 import { SmtpEmailProvider } from "./email/SmtpEmailProvider.js";
 import { TwilioSmsProvider } from "./sms/TwilioSmsProvider.js";
+import { renderDefaultEmailHtml } from "../templates/defaultEmailTemplate.js";
 import type { NotificationChannel } from "../generated/prisma/enums.js";
 
 const emailProvider = new SmtpEmailProvider();
@@ -17,11 +18,14 @@ export async function dispatchNotification(
 ): Promise<DispatchResult> {
   switch (channel) {
     case "EMAIL": {
-      const emailPayload = payload as { subject: string; html: string; text?: string };
+      const emailPayload = payload as { subject: string; html?: string; text?: string };
+      const html =
+        emailPayload.html ??
+        renderDefaultEmailHtml({ subject: emailPayload.subject, text: emailPayload.text });
       const result = await emailProvider.send({
         to: recipient,
         subject: emailPayload.subject,
-        html: emailPayload.html,
+        html,
         text: emailPayload.text,
       });
       return { providerMessageId: result.providerMessageId, providerUsed: "smtp" };

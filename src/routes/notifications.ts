@@ -7,7 +7,7 @@ import { requireAuth } from "../auth/requireAuth.js";
 
 const emailPayloadSchema = z.object({
   subject: z.string().min(1),
-  html: z.string().min(1),
+  html: z.string().min(1).optional(),
   text: z.string().optional(),
 });
 
